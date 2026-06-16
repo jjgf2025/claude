@@ -1,0 +1,71 @@
+╔══════════════════════════════════════════════════════════════╗
+║        DTI Portal - Custom Purchases Report Downloader       ║
+╚══════════════════════════════════════════════════════════════╝
+
+KAKO RADI:
+  • Ponedeljkom  → skida Cetvrtak-Subota prethodne sedmice
+  • Cetvrtvom    → skida Ponedeljak-Sreda tekuce sedmice
+  • Automatski highlightuje CRVENO sve redove sa praznim Order ID
+  • Cuva Excel fajl na Desktop u folderu "DTI_Reports"
+
+══════════════════════════════════════════════════════════════
+ KORAK 1 - Python (jednom)
+══════════════════════════════════════════════════════════════
+  1. Idi na: https://www.python.org/downloads/
+  2. Skini Python 3.11 ili noviji
+  3. OBAVEZNO cekiraj "Add Python to PATH" pri instalaciji
+  4. Pokreni setup.bat (dvaput klikni)
+
+══════════════════════════════════════════════════════════════
+ KORAK 2 - OperaDriver (jednom)
+══════════════════════════════════════════════════════════════
+  1. Provjeri verziju tvoje Opere:
+     Opera meni (hamburger gore lijevo) → About Opera
+     Zapisi broj verzije (npr. 119.0.xxxx)
+
+  2. Idi na:
+     https://github.com/operasoftware/operachromiumdriver/releases
+
+  3. Skini odgovarajuci operadriver_win64.zip
+
+  4. Raspakuj i kopiraj "operadriver.exe" u ovaj folder
+     (isti folder gdje je i dti_report.py)
+
+══════════════════════════════════════════════════════════════
+ KORAK 3 - Desktop shortcut (jednom)
+══════════════════════════════════════════════════════════════
+  1. Desni klik na  DTI_Report_Downloader.vbs
+  2. "Send to" → "Desktop (create shortcut)"
+  3. Mozes promijeniti ikonu: desni klik na shortcut → Properties
+     → Change Icon → pretrazi za Excel ili custom ikonu
+
+══════════════════════════════════════════════════════════════
+ SVAKI PONEDELJAK / CETVRTAK
+══════════════════════════════════════════════════════════════
+  1. Otvori Opera i uloguj se na dtiportal.com (ako vec nisi)
+  2. Dvaput klikni na shortcut na desktopu
+  3. Script ce automatski:
+     - Otvoriti portal u Operi
+     - Izabrati Custom Purchases
+     - Unijeti tacne datume
+     - Skinuti Excel
+     - Highlightovati prazne Order ID crveno
+     - Sacuvati fajl u DTI_Reports na desktopu
+
+══════════════════════════════════════════════════════════════
+ GDJE SU FAJLOVI?
+══════════════════════════════════════════════════════════════
+  Desktop → DTI_Reports → CustomPurchases_PON_YYYYMMDD_YYYYMMDD.xlsx
+                          CustomPurchases_CET_YYYYMMDD_YYYYMMDD.xlsx
+
+══════════════════════════════════════════════════════════════
+ PROBLEMI?
+══════════════════════════════════════════════════════════════
+  • "Opera nije pronadjena" → Provjeri putanju u dti_report.py
+    (linija OPERA_BINARY_CANDIDATES)
+
+  • "Nije moguce naci dropdown" → Stranica se mozda promijenila.
+    Javi mi screenshot i prilagodim selektore.
+
+  • Datumi se ne unose automatski → Script ce te pitati da ih
+    unesl rucno i onda nastavi automatski.
