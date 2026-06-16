@@ -54,6 +54,7 @@ SAVE_FOLDER = str(Path.home() / "Desktop" / "DTI_Reports")
 
 # Opera GX putanje  (auto-detect, ali mozes rucno podesiti)
 OPERA_BINARY_CANDIDATES = [
+    r"C:\Users\{user}\AppData\Local\Programs\Opera GX\launcher.exe",
     r"C:\Users\{user}\AppData\Local\Programs\Opera GX\opera.exe",
     r"C:\Program Files\Opera GX\opera.exe",
     r"C:\Program Files (x86)\Opera GX\opera.exe",
@@ -63,9 +64,9 @@ OPERA_PROFILE_CANDIDATES = [
     r"C:\Users\{user}\AppData\Local\Opera Software\Opera GX Stable",
 ]
 
-# OperaDriver (chromedriver kompatibilan) - skini sa https://github.com/operasoftware/operachromiumdriver/releases
-# Stavi operadriver.exe u isti folder kao i ovaj script, ili navedi punu putanju:
-OPERADRIVER_PATH = os.path.join(os.path.dirname(__file__), "operadriver.exe")
+# ChromeDriver 147 - stavi chromedriver.exe u isti folder kao ovaj script
+# Skini sa: googlechromelabs.github.io/chrome-for-testing/ → 147.x → win64
+CHROMEDRIVER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chromedriver.exe")
 
 # ══════════════════════════════════════════════════════════════════
 
@@ -145,17 +146,15 @@ def launch_browser(download_dir):
     options.add_argument("--disable-dev-shm-usage")
     # options.add_argument("--headless")  # Uncomment za invisible mod
 
-    # Koristi operadriver ako postoji, inace chromedriver
-    if os.path.exists(OPERADRIVER_PATH):
-        service = Service(executable_path=OPERADRIVER_PATH)
+    # Koristi chromedriver.exe iz istog foldera
+    if os.path.exists(CHROMEDRIVER_PATH):
+        service = Service(executable_path=CHROMEDRIVER_PATH)
     else:
-        # Fallback na chromedriver iz PATH
-        print("[INFO] operadriver.exe nije nadjen, pokusavam chromedriver...")
-        try:
-            from webdriver_manager.chrome import ChromeDriverManager
-            service = Service(ChromeDriverManager().install())
-        except Exception:
-            service = Service()  # ocekuje da je u PATH
+        print("[GRESKA] chromedriver.exe nije pronadjen u folderu skripte!")
+        print(f"  Ocekivana lokacija: {CHROMEDRIVER_PATH}")
+        print("  Skini ChromeDriver 147 sa: googlechromelabs.github.io/chrome-for-testing/")
+        input("Pritisni Enter za izlaz...")
+        sys.exit(1)
 
     driver = webdriver.Chrome(service=service, options=options)
     return driver
