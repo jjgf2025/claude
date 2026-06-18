@@ -165,26 +165,11 @@ def launch_browser(download_dir):
     options = Options()
     options.binary_location = opera_bin
 
-    # Koristi postojeci profil (da bude vec ulogovan)
-    # VAZNO: Opera ne smije biti otvorena kada se script pokrece!
-    if opera_profile:
-        # Kopiraj profil u temp da izbjegnemo konflikt sa otvorenom Operom
-        temp_profile = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "opera_dti_profile")
-        if os.path.exists(temp_profile):
-            shutil.rmtree(temp_profile, ignore_errors=True)
-        print("[INFO] Kopiram Opera profil (moze potrajati par sekundi)...")
-        try:
-            shutil.copytree(opera_profile, temp_profile,
-                          ignore=shutil.ignore_patterns('lockfile', 'SingletonLock',
-                                                        'SingletonCookie', 'SingletonSocket',
-                                                        'Cache', 'Code Cache', 'GPUCache',
-                                                        'ShaderCache', 'DawnCache'))
-            options.add_argument(f"--user-data-dir={temp_profile}")
-            print(f"[OK] Profil kopiran u: {temp_profile}")
-        except Exception as e:
-            print(f"[UPOZORENJE] Nisam mogao kopirati profil: {e}")
-            print("[INFO] Pokusavam direktno sa originalnim profilom...")
-            options.add_argument(f"--user-data-dir={opera_profile}")
+    # Dedicated profil samo za DTI script - pamti login, Opera moze biti otvorena
+    dti_profile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dti_browser_profile")
+    os.makedirs(dti_profile, exist_ok=True)
+    options.add_argument(f"--user-data-dir={dti_profile}")
+    print(f"[OK] Koristim DTI profil: {dti_profile}")
 
     # Download postavke
     prefs = {
