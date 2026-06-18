@@ -1,7 +1,17 @@
 ' DTI Portal Report Downloader
 
 Dim scriptDir, pythonScript, shell
-scriptDir    = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+Dim fsoTemp
+Set fsoTemp = CreateObject("Scripting.FileSystemObject")
+' Resolve shortcut -> get real VBS path
+Dim realPath
+realPath = WScript.ScriptFullName
+If fsoTemp.GetExtensionName(realPath) = "lnk" Or InStr(realPath, "Shortcut") > 0 Then
+    Dim sh2
+    Set sh2 = CreateObject("WScript.Shell")
+    realPath = sh2.CreateShortcut(realPath).TargetPath
+End If
+scriptDir    = fsoTemp.GetParentFolderName(realPath)
 pythonScript = scriptDir & "\dti_report.py"
 Set shell    = CreateObject("WScript.Shell")
 
