@@ -1,10 +1,34 @@
 ' DTI Portal Report Downloader
-' Pokretanje bez crnog konzolnog prozora
 
 Dim scriptDir, pythonScript, shell
-scriptDir   = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
+scriptDir    = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
 pythonScript = scriptDir & "\dti_report.py"
-Set shell = CreateObject("WScript.Shell")
+Set shell    = CreateObject("WScript.Shell")
 
-' Pokreni Python skriptu u novom konzolnom prozoru (vidljiv progress)
-shell.Run "cmd /c python """ & pythonScript & """", 1, False
+' Pokusaj sa "python" komandom
+Dim result
+result = shell.Run("cmd /k python """ & pythonScript & """", 1, True)
+
+If result <> 0 Then
+    ' Ako python nije u PATH, pokusaj sa punom putanjom
+    Dim fso, pyPaths, p, i
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    pyPaths = Array( _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Python\python.exe", _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python314\python.exe", _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python313\python.exe", _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python312\python.exe", _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python311\python.exe", _
+        "C:\Python314\python.exe", _
+        "C:\Python313\python.exe", _
+        "C:\Python312\python.exe" _
+    )
+    For i = 0 To UBound(pyPaths)
+        If fso.FileExists(pyPaths(i)) Then
+            shell.Run "cmd /k """ & pyPaths(i) & """ """ & pythonScript & """", 1, True
+            WScript.Quit
+        End If
+    Next
+    MsgBox "Python nije pronadjen!" & vbCrLf & vbCrLf & _
+           "Pokreni setup.bat iz foldera:" & vbCrLf & scriptDir, 16, "DTI Report - Greska"
+End If
