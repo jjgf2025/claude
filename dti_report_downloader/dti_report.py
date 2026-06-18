@@ -148,32 +148,36 @@ def wait_for_new_file(known_files, timeout=30):
     return None
 
 
-def highlight_blank_order_ids(filepath):
-    try:
-        wb = openpyxl.load_workbook(filepath)
-    except Exception:
-        print("[UPOZORENJE] Ne mogu otvoriti Excel za highlight.")
-        return 0
+def csv_to_xlsx_with_highlight(csv_path, xlsx_path):
+    """Konvertuje CSV u Excel i highlightuje prazne Order ID redove."""
+    import csv as csv_mod
+    wb = openpyxl.Workbook()
     ws = wb.active
     order_id_col = None
-    for cell in ws[1]:
-        if cell.value and "order" in str(cell.value).lower():
-            order_id_col = cell.column
-            print(f"[OK] Kolona '{cell.value}' na poziciji {cell.column}")
-            break
-    if order_id_col is None:
-        print("[UPOZORENJE] Kolona 'Order ID' nije pronadjena.")
-        wb.save(filepath)
-        return 0
     count = 0
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        val = row[order_id_col - 1].value
-        if val is None or str(val).strip() == "":
-            for cell in row:
-                cell.fill = RED_FILL
-                cell.font = WHITE_FONT
-            count += 1
-    wb.save(filepath)
+
+    with open(csv_path, newline='', encoding='utf-8-sig', errors='replace') as f:
+        reader = csv_mod.reader(f)
+        for row_idx, row in enumerate(reader, start=1):
+            for col_idx, val in enumerate(row, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=val)
+            if row_idx == 1:
+                # Nadji Order ID kolonu
+                for col_idx, val in enumerate(row, start=1):
+                    if "order" in val.lower():
+                        order_id_col = col_idx
+                        print(f"[OK] Kolona '{val}' na poziciji {col_idx}")
+                        break
+            elif order_id_col:
+                cell_val = row[order_id_col - 1] if len(row) >= order_id_col else ""
+                if not cell_val.strip():
+                    for col_idx in range(1, len(row) + 1):
+                        c = ws.cell(row=row_idx, column=col_idx)
+                        c.fill = RED_FILL
+                        c.font = WHITE_FONT
+                    count += 1
+
+    wb.save(xlsx_path)
     print(f"[OK] Highlightovano {count} redova sa praznim Order ID.")
     return count
 
@@ -245,14 +249,32 @@ def run():
             pick_date(page, "End Date", end_date)
             page.wait_for_timeout(500)
 
-            # Klik na Add dugme
-            print("[4/5] Dodavanje reporta...")
+            # Provjeri da li report za ovaj period vec postoji
+            report_exists = False
             try:
-                page.click("button:has-text('Add'), button[type='submit'], input[type='submit']")
-                print("[OK] Report dodat.")
+                for lnk in page.locator("a:visible").all():
+                    try:
+                        txt = lnk.inner_text(timeout=300).strip()
+                        if "Purchases from" in txt and start_date.strftime("%m/%d") in txt:
+                            report_exists = True
+                            print(f"[INFO] Report vec postoji: {txt}")
+                            break
+                    except Exception:
+                        continue
             except Exception:
-                print("[!] Add dugme nije nadjen automatski. Klikni ga rucno pa pritisni Enter...")
-                input()
+                pass
+
+            print("[4/5] Dodavanje reporta...")
+            if not report_exists:
+                try:
+                    page.click("button:has-text('Add'), button[type='submit'], input[type='submit']")
+                    print("[OK] Report dodat.")
+                    page.wait_for_timeout(2000)
+                except Exception:
+                    print("[!] Add dugme nije nadjen. Klikni ga rucno pa pritisni Enter...")
+                    input()
+            else:
+                print("[INFO] Koristim postojeci report.")
 
             # Cekanje da report postane Ready i download
             print("[...] Cekanje da report bude spreman...")
@@ -321,20 +343,39 @@ def run():
 
     print(f"[OK] Fajl skinut: {os.path.basename(downloaded_file)}")
 
-    day_label = "PON" if date.today().weekday() == 0 else "CET"
-    ext = os.path.splitext(downloaded_file)[1]
-    if not ext or ext not in [".xlsx", ".xls", ".csv"]:
-        ext = ".xlsx"
-    new_name = f"CustomPurchases_{day_label}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}{ext}"
-    final_path = os.path.join(SAVE_FOLDER, new_name)
-    shutil.copy2(downloaded_file, final_path)
+    day_label  = "PON" if date.today().weekday() == 0 else "CET"
+    final_path = os.path.join(SAVE_FOLDER,
+                              f"CustomPurchases_{day_label}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx")
+
+    print(f"\n[5/5] Konvertovanje u Excel i highlight praznih Order ID...")
+    src_ext = os.path.splitext(downloaded_file)[1].lower()
+    if src_ext in (".csv", ""):
+        blank_count = csv_to_xlsx_with_highlight(downloaded_file, final_path)
+    else:
+        shutil.copy2(downloaded_file, final_path)
+        blank_count = 0
+        try:
+            wb = openpyxl.load_workbook(final_path)
+            ws = wb.active
+            order_id_col = None
+            for cell in ws[1]:
+                if cell.value and "order" in str(cell.value).lower():
+                    order_id_col = cell.column
+                    break
+            if order_id_col:
+                for row in ws.iter_rows(min_row=2):
+                    if not str(row[order_id_col-1].value or "").strip():
+                        for c in row:
+                            c.fill = RED_FILL
+                            c.font = WHITE_FONT
+                        blank_count += 1
+            wb.save(final_path)
+        except Exception as e:
+            print(f"[UPOZORENJE] Highlight nije uspio: {e}")
     try:
         os.remove(downloaded_file)
     except Exception:
         pass
-
-    print(f"\n[5/5] Highlight praznih Order ID redova...")
-    blank_count = highlight_blank_order_ids(final_path)
 
     print(f"\n{'='*50}")
     print(f"  GOTOVO!")
