@@ -14,14 +14,15 @@ If result <> 0 Then
     Dim fso, pyPaths, p, i
     Set fso = CreateObject("Scripting.FileSystemObject")
     pyPaths = Array( _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Python\pythoncore-3.14-64\python.exe", _
+        shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Python\pythoncore-3.14-64\Scripts\python.exe", _
         shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Python\python.exe", _
         shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python314\python.exe", _
         shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python313\python.exe", _
         shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python312\python.exe", _
         shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Programs\Python\Python311\python.exe", _
         "C:\Python314\python.exe", _
-        "C:\Python313\python.exe", _
-        "C:\Python312\python.exe" _
+        "C:\Python313\python.exe" _
     )
     For i = 0 To UBound(pyPaths)
         If fso.FileExists(pyPaths(i)) Then
