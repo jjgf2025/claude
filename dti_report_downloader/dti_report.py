@@ -263,13 +263,17 @@ def run():
                         target_link = purchase_links[-1]
                         txt = target_link.inner_text(timeout=300).strip()
                         print(f"[OK] Klikcem: {txt}")
+                        save_tmp = os.path.join(SAVE_FOLDER, "_dl_tmp")
+                        os.makedirs(save_tmp, exist_ok=True)
                         with page.expect_download(timeout=30000) as dl_info:
                             target_link.click()
                         dl = dl_info.value
-                        tmp_path = dl.path()
-                        if tmp_path and os.path.exists(tmp_path):
+                        fname = dl.suggested_filename or "report.csv"
+                        tmp_path = os.path.join(save_tmp, fname)
+                        dl.save_as(tmp_path)
+                        if os.path.exists(tmp_path):
                             downloaded_file = tmp_path
-                            print(f"[OK] Preuzeto: {dl.suggested_filename}")
+                            print(f"[OK] Preuzeto: {fname}")
                             break
                 except Exception as ex:
                     print(f"[...] {ex}")
