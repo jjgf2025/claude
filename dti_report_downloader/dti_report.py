@@ -131,8 +131,25 @@ def launch_browser(download_dir):
     options.binary_location = opera_bin
 
     # Koristi postojeci profil (da bude vec ulogovan)
+    # VAZNO: Opera ne smije biti otvorena kada se script pokrece!
     if opera_profile:
-        options.add_argument(f"--user-data-dir={opera_profile}")
+        # Kopiraj profil u temp da izbjegnemo konflikt sa otvorenom Operom
+        temp_profile = os.path.join(os.environ.get("TEMP", "C:\\Temp"), "opera_dti_profile")
+        if os.path.exists(temp_profile):
+            shutil.rmtree(temp_profile, ignore_errors=True)
+        print("[INFO] Kopiram Opera profil (moze potrajati par sekundi)...")
+        try:
+            shutil.copytree(opera_profile, temp_profile,
+                          ignore=shutil.ignore_patterns('lockfile', 'SingletonLock',
+                                                        'SingletonCookie', 'SingletonSocket',
+                                                        'Cache', 'Code Cache', 'GPUCache',
+                                                        'ShaderCache', 'DawnCache'))
+            options.add_argument(f"--user-data-dir={temp_profile}")
+            print(f"[OK] Profil kopiran u: {temp_profile}")
+        except Exception as e:
+            print(f"[UPOZORENJE] Nisam mogao kopirati profil: {e}")
+            print("[INFO] Pokusavam direktno sa originalnim profilom...")
+            options.add_argument(f"--user-data-dir={opera_profile}")
 
     # Download postavke
     prefs = {
@@ -144,7 +161,11 @@ def launch_browser(download_dir):
     options.add_experimental_option("prefs", prefs)
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    # options.add_argument("--headless")  # Uncomment za invisible mod
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-extensions")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
     # Koristi chromedriver.exe iz istog foldera
     if os.path.exists(CHROMEDRIVER_PATH):
@@ -152,12 +173,22 @@ def launch_browser(download_dir):
     else:
         print("[GRESKA] chromedriver.exe nije pronadjen u folderu skripte!")
         print(f"  Ocekivana lokacija: {CHROMEDRIVER_PATH}")
-        print("  Skini ChromeDriver 147 sa: googlechromelabs.github.io/chrome-for-testing/")
         input("Pritisni Enter za izlaz...")
         sys.exit(1)
 
-    driver = webdriver.Chrome(service=service, options=options)
-    return driver
+    print("[INFO] Pokretanje browsera...")
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+        print("[OK] Browser pokrenut uspjesno.")
+        return driver
+    except Exception as e:
+        print(f"\n[GRESKA] Nije moguce pokrenuti browser:")
+        print(f"  {e}")
+        print("\nMoguca resenja:")
+        print("  1. Zatvori Opera GX potpuno pa pokusaj ponovo")
+        print("  2. Provjeri da je chromedriver.exe u istom folderu kao script")
+        input("\nPritisni Enter za izlaz...")
+        sys.exit(1)
 
 
 def wait_for_download(download_dir, timeout=60):
