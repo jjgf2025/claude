@@ -90,9 +90,12 @@ def get_date_range():
 
 
 def pick_date(page, placeholder, target_date):
-    """Klikce kroz Bootstrap Datepicker."""
-    page.click(f"input[placeholder='{placeholder}']")
-    page.wait_for_timeout(600)
+    """Klikce kroz Bootstrap Datepicker - trazi vidljivo polje."""
+    # Cekaj da bude vidljivo i skroluj do njega
+    locator = page.locator(f"input[placeholder='{placeholder}']:visible").first
+    locator.scroll_into_view_if_needed()
+    locator.click()
+    page.wait_for_timeout(800)
 
     for _ in range(24):
         header = page.locator("th.datepicker-switch").first
@@ -219,8 +222,11 @@ def run():
             # Odaberi Custom Purchases
             try:
                 page.select_option("select", label="Custom Purchases")
-                page.wait_for_timeout(500)
+                page.wait_for_timeout(1000)
                 print("[OK] Custom Purchases selektovan.")
+                # Skroluj do forme sa datumima
+                page.locator("input[placeholder='Start Date']:visible").first.scroll_into_view_if_needed()
+                page.wait_for_timeout(500)
             except Exception:
                 print("[INFO] Dropdown nije nadjen ili vec selektovan.")
 
