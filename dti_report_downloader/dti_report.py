@@ -127,31 +127,24 @@ def pick_date(page, placeholder, target_date):
     return False
 
 
-def wait_for_download(download_dir, timeout=60):
-    """Trazi novi fajl u temp folderu I u korisnickom Downloads folderu."""
+def wait_for_new_file(known_files, timeout=30):
+    """Ceka da se pojavi novi fajl koji nije bio u known_files."""
     search_dirs = [
-        download_dir,
         str(Path.home() / "Downloads"),
+        str(Path.home() / "Desktop" / "DTI_Reports" / "_temp_download"),
     ]
-    # Zapamti fajlove koji vec postoje
-    existing = set()
-    for d in search_dirs:
-        if os.path.isdir(d):
-            for f in glob.glob(os.path.join(d, "*")):
-                existing.add(f)
-
     end = time.time() + timeout
     while time.time() < end:
         for d in search_dirs:
             if not os.path.isdir(d):
                 continue
-            files = [f for f in glob.glob(os.path.join(d, "*"))
-                     if not f.endswith(".crdownload") and not f.endswith(".tmp")
-                     and os.path.isfile(f) and f not in existing]
-            if files:
-                newest = max(files, key=os.path.getctime)
-                return newest
-        time.sleep(1)
+            for f in glob.glob(os.path.join(d, "*")):
+                if (f not in known_files
+                        and os.path.isfile(f)
+                        and not f.endswith(".crdownload")
+                        and not f.endswith(".tmp")):
+                    return f
+        time.sleep(0.5)
     return None
 
 
@@ -287,11 +280,16 @@ def run():
                         last_link = purchase_links[-1]
                         txt = last_link.inner_text(timeout=500).strip()
                         print(f"[OK] Klikcem zadnji report: {txt}")
-                        # Klikni link - download ce poceti automatski
+                        # Zapamti sve postojece fajlove PRE klika
+                        known = set()
+                        for d in [str(Path.home() / "Downloads"), temp_dl]:
+                            if os.path.isdir(d):
+                                known.update(glob.glob(os.path.join(d, "*")))
+                        # Klikni link
                         last_link.click()
-                        page.wait_for_timeout(3000)
-                        # Cekaj da se fajl pojavi u temp folderu
-                        downloaded_file = wait_for_download(temp_dl, timeout=30)
+                        page.wait_for_timeout(1000)
+                        # Cekaj novi fajl
+                        downloaded_file = wait_for_new_file(known, timeout=30)
                         if downloaded_file:
                             print(f"[OK] Skinut: {os.path.basename(downloaded_file)}")
                             break
@@ -324,7 +322,9 @@ def run():
     print(f"[OK] Fajl skinut: {os.path.basename(downloaded_file)}")
 
     day_label = "PON" if date.today().weekday() == 0 else "CET"
-    ext = os.path.splitext(downloaded_file)[1] or ".xlsx"
+    ext = os.path.splitext(downloaded_file)[1]
+    if not ext or ext not in [".xlsx", ".xls", ".csv"]:
+        ext = ".xlsx"
     new_name = f"CustomPurchases_{day_label}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}{ext}"
     final_path = os.path.join(SAVE_FOLDER, new_name)
     shutil.copy2(downloaded_file, final_path)
