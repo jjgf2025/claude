@@ -256,7 +256,8 @@ def run():
                 page.wait_for_timeout(2000)
 
                 try:
-                    # Trazi bilo koji link sa "Purchases from" u tekstu
+                    # Trazi SVE linkove sa "Purchases from" i uzmi ZADNJI (najnoviji)
+                    purchase_links = []
                     links = page.locator("a:visible").all()
                     for lnk in links:
                         try:
@@ -264,21 +265,27 @@ def run():
                         except Exception:
                             continue
                         if "Purchases from" in txt or "Purchases From" in txt:
-                            print(f"[OK] Klikcem: {txt}")
-                            with page.expect_download(timeout=30000) as dl_info:
-                                lnk.click()
-                            download = dl_info.value
-                            save_path = os.path.join(temp_dl, download.suggested_filename or "report.xlsx")
-                            download.save_as(save_path)
-                            downloaded_file = save_path
-                            print(f"[OK] Skinut: {download.suggested_filename}")
+                            purchase_links.append(lnk)
+
+                    if purchase_links:
+                        last_link = purchase_links[-1]
+                        txt = last_link.inner_text(timeout=500).strip()
+                        print(f"[OK] Klikcem zadnji report: {txt}")
+                        # Klikni link - download ce poceti automatski
+                        last_link.click()
+                        page.wait_for_timeout(3000)
+                        # Cekaj da se fajl pojavi u temp folderu
+                        downloaded_file = wait_for_download(temp_dl, timeout=30)
+                        if downloaded_file:
+                            print(f"[OK] Skinut: {os.path.basename(downloaded_file)}")
                             break
+                        print("[...] Cekam da download zavrsi...")
                 except Exception as ex:
-                    print(f"[...] Cekam... ({ex})")
+                    print(f"[...] {ex}")
 
                 if downloaded_file:
                     break
-                print("[...] Report jos nije spreman, cekam 3s...")
+                print("[...] Report jos nije spreman, cekam...")
 
             if not downloaded_file:
                 # Pokusaj direktno iz temp foldera
