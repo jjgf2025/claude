@@ -87,21 +87,10 @@ PORTAL_URL = "https://www.dtiportal.com"
 # Desktop folder za cuvanje reporta
 SAVE_FOLDER = str(Path.home() / "Desktop" / "DTI_Reports")
 
-# Opera GX putanje  (auto-detect, ali mozes rucno podesiti)
-OPERA_BINARY_CANDIDATES = [
-    r"C:\Users\{user}\AppData\Local\Programs\Opera GX\launcher.exe",
-    r"C:\Users\{user}\AppData\Local\Programs\Opera GX\opera.exe",
-    r"C:\Program Files\Opera GX\opera.exe",
-    r"C:\Program Files (x86)\Opera GX\opera.exe",
-]
-OPERA_PROFILE_CANDIDATES = [
-    r"C:\Users\{user}\AppData\Roaming\Opera Software\Opera GX Stable",
-    r"C:\Users\{user}\AppData\Local\Opera Software\Opera GX Stable",
-]
-
-# ChromeDriver 147 - stavi chromedriver.exe u isti folder kao ovaj script
-# Skini sa: googlechromelabs.github.io/chrome-for-testing/ → 147.x → win64
-CHROMEDRIVER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chromedriver.exe")
+# Chrome for Testing binary - u folderu skripte
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CHROMEDRIVER_PATH = os.path.join(SCRIPT_DIR, "chromedriver.exe")
+CHROME_BINARY_PATH = os.path.join(SCRIPT_DIR, "chrome-win64", "chrome.exe")
 
 # ══════════════════════════════════════════════════════════════════
 
@@ -131,45 +120,25 @@ def get_date_range():
     return start, end
 
 
-def find_opera():
-    user = os.environ.get("USERNAME", os.environ.get("USER", ""))
-    for c in OPERA_BINARY_CANDIDATES:
-        p = c.replace("{user}", user)
-        if os.path.exists(p):
-            return p
-    return None
-
-
-def find_opera_profile():
-    user = os.environ.get("USERNAME", os.environ.get("USER", ""))
-    for c in OPERA_PROFILE_CANDIDATES:
-        p = c.replace("{user}", user)
-        if os.path.exists(p):
-            return p
-    return None
-
-
 def launch_browser(download_dir):
-    opera_bin = find_opera()
-    opera_profile = find_opera_profile()
-
-    if not opera_bin:
-        print("[GRESKA] Opera GX nije pronadjena. Provjeri putanju u skripti.")
-        input("Enter za izlaz...")
+    if not os.path.exists(CHROME_BINARY_PATH):
+        print("[GRESKA] chrome-win64\\chrome.exe nije pronadjen!")
+        print(f"  Ocekivana lokacija: {CHROME_BINARY_PATH}")
+        print("\n  Pokreni ovu komandu u cmd da skines Chrome for Testing:")
+        print(f'  powershell -Command "Invoke-WebRequest -Uri \'https://storage.googleapis.com/chrome-for-testing-public/149.0.7827.115/win64/chrome-win64.zip\' -OutFile \'$env:TEMP\\chrome-win64.zip\'; Expand-Archive \'$env:TEMP\\chrome-win64.zip\' -DestinationPath \'{SCRIPT_DIR}\' -Force"')
+        input("\nPritisni Enter za izlaz...")
         sys.exit(1)
 
-    print(f"[OK] Opera pronadjena: {opera_bin}")
-    if opera_profile:
-        print(f"[OK] Opera profil: {opera_profile}")
+    print(f"[OK] Chrome for Testing: {CHROME_BINARY_PATH}")
 
     options = Options()
-    options.binary_location = opera_bin
+    options.binary_location = CHROME_BINARY_PATH
 
-    # Dedicated profil samo za DTI script - pamti login, Opera moze biti otvorena
-    dti_profile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dti_browser_profile")
+    # Dedicated profil - pamti login između pokretanja
+    dti_profile = os.path.join(SCRIPT_DIR, "dti_browser_profile")
     os.makedirs(dti_profile, exist_ok=True)
     options.add_argument(f"--user-data-dir={dti_profile}")
-    print(f"[OK] Koristim DTI profil: {dti_profile}")
+    print(f"[OK] DTI profil: {dti_profile}")
 
     # Download postavke
     prefs = {
