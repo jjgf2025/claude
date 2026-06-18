@@ -247,36 +247,38 @@ def run():
 
             # Cekanje da report postane Ready i download
             print("[...] Cekanje da report bude spreman...")
-            start_str = start_date.strftime("%m/%d/%Y")
-            end_str   = end_date.strftime("%m/%d/%Y")
-
             downloaded_file = None
             deadline = time.time() + 120
+
             while time.time() < deadline:
+                page.wait_for_timeout(3000)
+                page.reload(wait_until="domcontentloaded")
+                page.wait_for_timeout(2000)
+
                 try:
-                    links = page.locator("a").all()
+                    # Trazi bilo koji link sa "Purchases from" u tekstu
+                    links = page.locator("a:visible").all()
                     for lnk in links:
-                        txt = lnk.inner_text()
-                        if "Purchases" in txt and (
-                            start_date.strftime("%-m/%-d/%Y") in txt or
-                            start_str in txt or
-                            start_date.strftime("%m/%d/%Y").lstrip("0").replace("/0", "/") in txt
-                        ):
-                            print(f"[OK] Report spreman: {txt.strip()}")
+                        try:
+                            txt = lnk.inner_text(timeout=500).strip()
+                        except Exception:
+                            continue
+                        if "Purchases from" in txt or "Purchases From" in txt:
+                            print(f"[OK] Klikcem: {txt}")
                             with page.expect_download(timeout=30000) as dl_info:
                                 lnk.click()
                             download = dl_info.value
                             save_path = os.path.join(temp_dl, download.suggested_filename or "report.xlsx")
                             download.save_as(save_path)
                             downloaded_file = save_path
+                            print(f"[OK] Skinut: {download.suggested_filename}")
                             break
-                except Exception:
-                    pass
+                except Exception as ex:
+                    print(f"[...] Cekam... ({ex})")
+
                 if downloaded_file:
                     break
-                time.sleep(3)
-                page.reload(wait_until="domcontentloaded")
-                page.wait_for_timeout(1000)
+                print("[...] Report jos nije spreman, cekam 3s...")
 
             if not downloaded_file:
                 # Pokusaj direktno iz temp foldera
