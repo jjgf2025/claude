@@ -128,13 +128,29 @@ def pick_date(page, placeholder, target_date):
 
 
 def wait_for_download(download_dir, timeout=60):
+    """Trazi novi fajl u temp folderu I u korisnickom Downloads folderu."""
+    search_dirs = [
+        download_dir,
+        str(Path.home() / "Downloads"),
+    ]
+    # Zapamti fajlove koji vec postoje
+    existing = set()
+    for d in search_dirs:
+        if os.path.isdir(d):
+            for f in glob.glob(os.path.join(d, "*")):
+                existing.add(f)
+
     end = time.time() + timeout
     while time.time() < end:
-        files = [f for f in glob.glob(os.path.join(download_dir, "*"))
-                 if not f.endswith(".crdownload") and not f.endswith(".tmp")
-                 and os.path.isfile(f)]
-        if files:
-            return max(files, key=os.path.getctime)
+        for d in search_dirs:
+            if not os.path.isdir(d):
+                continue
+            files = [f for f in glob.glob(os.path.join(d, "*"))
+                     if not f.endswith(".crdownload") and not f.endswith(".tmp")
+                     and os.path.isfile(f) and f not in existing]
+            if files:
+                newest = max(files, key=os.path.getctime)
+                return newest
         time.sleep(1)
     return None
 
@@ -325,6 +341,10 @@ def run():
     print(f"  Fajl: {final_path}")
     print(f"  Prazni Order IDs (crveno): {blank_count}")
     print(f"{'='*50}\n")
+
+    # Automatski otvori Excel fajl
+    print("[INFO] Otvaram Excel...")
+    os.startfile(final_path)
 
     try:
         shutil.rmtree(temp_dl, ignore_errors=True)
