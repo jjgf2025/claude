@@ -12,8 +12,43 @@ import sys
 import time
 import glob
 import shutil
+import hashlib
+import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
+
+# ── AUTO-UPDATE ────────────────────────────────────────────────────
+SCRIPT_VERSION = "1.3"
+UPDATE_URL = (
+    "https://raw.githubusercontent.com/jjgf2025/claude/"
+    "claude/relaxed-keller-6nkadt/dti_report_downloader/dti_report.py"
+)
+
+def auto_update():
+    """Provjeri GitHub za novu verziju i zamijeni script ako postoji update."""
+    print("[UPDATE] Provjera nove verzije...")
+    try:
+        req = urllib.request.urlopen(UPDATE_URL, timeout=8)
+        latest = req.read()
+
+        current_path = os.path.abspath(__file__)
+        with open(current_path, "rb") as f:
+            current = f.read()
+
+        if hashlib.md5(latest).hexdigest() != hashlib.md5(current).hexdigest():
+            print("[UPDATE] Nova verzija pronadjena! Azuriram...")
+            backup = current_path + ".bak"
+            shutil.copy2(current_path, backup)
+            with open(current_path, "wb") as f:
+                f.write(latest)
+            print("[UPDATE] Script azuriran. Restartuj shortcut jednom.")
+            input("Pritisni Enter za izlaz (pa pokreni ponovo)...")
+            sys.exit(0)
+        else:
+            print("[UPDATE] Vec imas najnoviju verziju.")
+    except Exception as e:
+        print(f"[UPDATE] Preskacam update provjeru ({e})")
+# ──────────────────────────────────────────────────────────────────
 
 # ── openpyxl za highlight ──────────────────────────────────────────
 try:
@@ -255,6 +290,7 @@ def set_date_input(driver, selector, date_val):
 
 
 def run():
+    auto_update()
     start_date, end_date = get_date_range()
     print(f"\n{'='*50}")
     print(f"  DTI Portal - Custom Purchases Report")
