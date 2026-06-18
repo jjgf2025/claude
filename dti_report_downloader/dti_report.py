@@ -273,19 +273,15 @@ def run():
             time.sleep(2)
 
         print("[2/5] Navigacija na Reports sekciju...")
-        try:
-            # Pokusaj kliknuti na Reports u navigaciji
-            reports_link = wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(translate(text(),'REPORTS','reports'),'report')]")
-                )
-            )
-            reports_link.click()
-            time.sleep(2)
-        except TimeoutException:
-            # Ako nema direktnog linka, idi na /reports URL
-            driver.get(PORTAL_URL + "/reports")
-            time.sleep(2)
+        driver.get(PORTAL_URL + "/reports/")
+        time.sleep(3)
+
+        # Provjeri login ponovo nakon navigacije
+        if "login" in driver.current_url.lower() or "signin" in driver.current_url.lower():
+            print("\n[!] Nisi ulogovan/a. Uloguj se u browser pa pritisni Enter ovdje...")
+            input()
+            driver.get(PORTAL_URL + "/reports/")
+            time.sleep(3)
 
         print("[3/5] Podesavanje datuma i tipa reporta...")
 
@@ -298,54 +294,103 @@ def run():
             )
             Select(report_select).select_by_visible_text("Custom Purchases")
             time.sleep(1)
+            print("[OK] Custom Purchases selektovan.")
         except TimeoutException:
-            print("[GRESKA] Nije moguce naci dropdown za tip reporta.")
-            print("Sacuvaj stranicu rucno pa pritisni Enter...")
+            print("[INFO] Dropdown nije nadjen, mozda je vec selektovan.")
+
+        # ── Unos Start Date preko calendar picker-a ──
+        def set_date_via_calendar(placeholder, target_date):
+            try:
+                inp = wait.until(EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, f"input[placeholder='{placeholder}']")
+                ))
+                # Pokusaj direktan unos teksta
+                driver.execute_script("arguments[0].value = '';", inp)
+                inp.click()
+                time.sleep(0.5)
+                inp.send_keys(target_date.strftime("%m/%d/%Y"))
+                time.sleep(0.5)
+                # Trigger events
+                driver.execute_script(
+                    "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));"
+                    "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));", inp
+                )
+                # Klikni negdje drugdje da zatvori kalendar
+                driver.find_element(By.TAG_NAME, "body").click()
+                time.sleep(0.5)
+                val = inp.get_attribute("value")
+                if val and len(val) > 3:
+                    print(f"[OK] {placeholder}: {val}")
+                    return True
+                # Ako text unos nije radio - navigiraj kalendar
+                inp.click()
+                time.sleep(0.5)
+                return navigate_calendar(target_date)
+            except Exception as e:
+                print(f"[UPOZORENJE] {placeholder}: {e}")
+                return False
+
+        def navigate_calendar(target_date):
+            """Klikce kroz kalendar da odabere datum."""
+            try:
+                for _ in range(24):  # max 24 mjeseca naprijed/nazad
+                    try:
+                        header = driver.find_element(By.CSS_SELECTOR, ".datepicker-days .datepicker-switch, .picker__nav--next, table th.datepicker-switch")
+                        current_text = header.text  # npr "June 2026"
+                    except Exception:
+                        break
+                    target_text = target_date.strftime("%B %Y")
+                    if target_text in current_text or current_text in target_text:
+                        # Pronasli smo mjesec - klikni dan
+                        days = driver.find_elements(By.CSS_SELECTOR, "td.day:not(.old):not(.new)")
+                        for day in days:
+                            if day.text == str(target_date.day):
+                                day.click()
+                                time.sleep(0.3)
+                                return True
+                        break
+                    # Idi naprijed ili nazad
+                    try:
+                        from datetime import datetime
+                        cal_date = datetime.strptime(current_text.strip(), "%B %Y").date().replace(day=1)
+                        if target_date.replace(day=1) > cal_date:
+                            driver.find_element(By.CSS_SELECTOR, "th.next, .next").click()
+                        else:
+                            driver.find_element(By.CSS_SELECTOR, "th.prev, .prev").click()
+                        time.sleep(0.3)
+                    except Exception:
+                        break
+            except Exception:
+                pass
+            return False
+
+        from_ok = set_date_via_calendar("Start Date", start_date)
+        time.sleep(0.5)
+        to_ok = set_date_via_calendar("End Date", end_date)
+
+        if not from_ok or not to_ok:
+            print(f"\n[!] Datumi nisu uneti automatski.")
+            print(f"    Unesi rucno u browser:")
+            print(f"    Start Date: {start_date.strftime('%m/%d/%Y')}")
+            print(f"    End Date:   {end_date.strftime('%m/%d/%Y')}")
+            print(f"    Pa pritisni Enter ovdje...")
             input()
 
-        # ── Unos datuma ──
-        # Probamo vise mogucih selektora za Date From/To
-        date_from_selectors = [
-            "input[name*='from']", "input[name*='start']",
-            "input[placeholder*='From']", "input[id*='from']",
-            "input[id*='start']", ".date-from input", "#dateFrom",
-        ]
-        date_to_selectors = [
-            "input[name*='to']", "input[name*='end']",
-            "input[placeholder*='To']", "input[id*='to']",
-            "input[id*='end']", ".date-to input", "#dateTo",
-        ]
-
-        from_set = False
-        for sel in date_from_selectors:
-            if set_date_input(driver, sel, start_date):
-                print(f"[OK] Date From: {start_date.strftime('%m/%d/%Y')}")
-                from_set = True
-                break
-
-        to_set = False
-        for sel in date_to_selectors:
-            if set_date_input(driver, sel, end_date):
-                print(f"[OK] Date To: {end_date.strftime('%m/%d/%Y')}")
-                to_set = True
-                break
-
-        if not from_set or not to_set:
-            print("[!] Datumi nisu automatski uneti. Unesi ih rucno i pritisni Enter...")
-            input()
-
-        # ── Klik na Export / Download dugme ──
+        # ── Klik na Add / Submit dugme ──
         print("[4/5] Pokretanje downloada...")
         try:
-            export_btn = driver.find_element(
-                By.XPATH,
-                "//button[contains(translate(text(),'EXPORTDOWNLOAD','exportdownload'),'export') or "
-                "contains(translate(text(),'EXPORTDOWNLOAD','exportdownload'),'download') or "
-                "contains(translate(text(),'EXPORTDOWNLOAD','exportdownload'),'excel')]"
-            )
-            export_btn.click()
-        except NoSuchElementException:
-            print("[!] Export dugme nije automatski pronadjeno. Klikni ga rucno pa pritisni Enter...")
+            submit_btn = wait.until(EC.element_to_be_clickable(
+                (By.XPATH,
+                 "//button[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'add') or "
+                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit') or "
+                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'generat') or "
+                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'export') or "
+                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'download')]")
+            ))
+            submit_btn.click()
+            print(f"[OK] Kliknuto dugme: {submit_btn.text}")
+        except Exception:
+            print("[!] Dugme nije pronadjeno automatski. Klikni ga rucno pa pritisni Enter...")
             input()
 
         print("[...] Cekanje na download (max 60s)...")
