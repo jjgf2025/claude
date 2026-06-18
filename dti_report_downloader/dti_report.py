@@ -285,116 +285,114 @@ def run():
 
         print("[3/5] Podesavanje datuma i tipa reporta...")
 
-        # ── Odabir Custom Purchases iz dropdown menija ──
+        from datetime import datetime as dt
+
+        def pick_date(placeholder, target_date):
+            """Klikce kroz Bootstrap Datepicker i bira trazeni datum."""
+            inp = wait.until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, f"input[placeholder='{placeholder}']")
+            ))
+            inp.click()
+            time.sleep(0.8)
+
+            for _ in range(24):
+                try:
+                    header = driver.find_element(By.CSS_SELECTOR, "th.datepicker-switch")
+                except Exception:
+                    break
+                current_text = header.text.strip()   # "June 2026"
+                target_text  = target_date.strftime("%B %Y")
+
+                if current_text == target_text:
+                    # Pronadjen pravi mjesec - klikni dan
+                    days = driver.find_elements(
+                        By.XPATH, "//td[contains(@class,'day') and not(contains(@class,'old')) and not(contains(@class,'new'))]"
+                    )
+                    for day_el in days:
+                        if day_el.text.strip() == str(target_date.day):
+                            day_el.click()
+                            time.sleep(0.4)
+                            val = inp.get_attribute("value")
+                            print(f"[OK] {placeholder}: {val}")
+                            return True
+                    break
+
+                # Navigacija naprijed/nazad
+                try:
+                    cur_dt = dt.strptime(current_text, "%B %Y")
+                    tgt_dt = dt.strptime(target_text, "%B %Y")
+                    if tgt_dt > cur_dt:
+                        driver.find_element(By.CSS_SELECTOR, "th.next").click()
+                    else:
+                        driver.find_element(By.CSS_SELECTOR, "th.prev").click()
+                    time.sleep(0.4)
+                except Exception:
+                    break
+
+            print(f"[GRESKA] Nisam mogao odabrati {placeholder} automatski.")
+            return False
+
+        # ── Odabir Custom Purchases ──
         try:
-            report_select = wait.until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//select[.//option[contains(text(),'Custom Purchases')]]")
-                )
-            )
+            report_select = wait.until(EC.presence_of_element_located(
+                (By.XPATH, "//select[.//option[contains(text(),'Custom Purchases')]]")
+            ))
             Select(report_select).select_by_visible_text("Custom Purchases")
-            time.sleep(1)
+            time.sleep(0.5)
             print("[OK] Custom Purchases selektovan.")
         except TimeoutException:
-            print("[INFO] Dropdown nije nadjen, mozda je vec selektovan.")
+            print("[INFO] Dropdown nije nadjen ili je vec selektovan.")
 
-        # ── Unos Start Date preko calendar picker-a ──
-        def set_date_via_calendar(placeholder, target_date):
-            try:
-                inp = wait.until(EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, f"input[placeholder='{placeholder}']")
-                ))
-                # Pokusaj direktan unos teksta
-                driver.execute_script("arguments[0].value = '';", inp)
-                inp.click()
-                time.sleep(0.5)
-                inp.send_keys(target_date.strftime("%m/%d/%Y"))
-                time.sleep(0.5)
-                # Trigger events
-                driver.execute_script(
-                    "arguments[0].dispatchEvent(new Event('input', {bubbles:true}));"
-                    "arguments[0].dispatchEvent(new Event('change', {bubbles:true}));", inp
-                )
-                # Klikni negdje drugdje da zatvori kalendar
-                driver.find_element(By.TAG_NAME, "body").click()
-                time.sleep(0.5)
-                val = inp.get_attribute("value")
-                if val and len(val) > 3:
-                    print(f"[OK] {placeholder}: {val}")
-                    return True
-                # Ako text unos nije radio - navigiraj kalendar
-                inp.click()
-                time.sleep(0.5)
-                return navigate_calendar(target_date)
-            except Exception as e:
-                print(f"[UPOZORENJE] {placeholder}: {e}")
-                return False
+        # ── Unos datuma ──
+        pick_date("Start Date", start_date)
+        time.sleep(0.3)
+        pick_date("End Date", end_date)
+        time.sleep(0.5)
 
-        def navigate_calendar(target_date):
-            """Klikce kroz kalendar da odabere datum."""
+        # ── Klik na Add dugme ──
+        print("[4/5] Dodavanje reporta...")
+        try:
+            add_btn = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[normalize-space(text())='Add' or normalize-space(text())='Submit' "
+                           "or normalize-space(text())='Generate' or normalize-space(text())='Add Report']")
+            ))
+            add_btn.click()
+            print(f"[OK] Kliknuto: '{add_btn.text}'")
+        except Exception:
+            # Pokusaj input[type=submit]
             try:
-                for _ in range(24):  # max 24 mjeseca naprijed/nazad
-                    try:
-                        header = driver.find_element(By.CSS_SELECTOR, ".datepicker-days .datepicker-switch, .picker__nav--next, table th.datepicker-switch")
-                        current_text = header.text  # npr "June 2026"
-                    except Exception:
-                        break
-                    target_text = target_date.strftime("%B %Y")
-                    if target_text in current_text or current_text in target_text:
-                        # Pronasli smo mjesec - klikni dan
-                        days = driver.find_elements(By.CSS_SELECTOR, "td.day:not(.old):not(.new)")
-                        for day in days:
-                            if day.text == str(target_date.day):
-                                day.click()
-                                time.sleep(0.3)
-                                return True
-                        break
-                    # Idi naprijed ili nazad
-                    try:
-                        from datetime import datetime
-                        cal_date = datetime.strptime(current_text.strip(), "%B %Y").date().replace(day=1)
-                        if target_date.replace(day=1) > cal_date:
-                            driver.find_element(By.CSS_SELECTOR, "th.next, .next").click()
-                        else:
-                            driver.find_element(By.CSS_SELECTOR, "th.prev, .prev").click()
-                        time.sleep(0.3)
-                    except Exception:
+                sub = driver.find_element(By.CSS_SELECTOR, "input[type='submit'], button[type='submit']")
+                sub.click()
+                print("[OK] Submit kliknut.")
+            except Exception:
+                print("[!] Add dugme nije nadjen - klikni ga rucno pa pritisni Enter...")
+                input()
+
+        # ── Cekanje da report bude Ready i klik za download ──
+        print("[...] Cekanje da report bude spreman (max 120s)...")
+        expected_label = f"Purchases from {start_date.strftime('%m/%d/%Y')} to {end_date.strftime('%m/%d/%Y')}"
+        downloaded = None
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            try:
+                links = driver.find_elements(By.XPATH, "//a[contains(text(),'Purchases from')]")
+                for lnk in links:
+                    if start_date.strftime("%m/%d/%Y") in lnk.text or start_date.strftime("%-m/%-d/%Y") in lnk.text:
+                        lnk.click()
+                        print(f"[OK] Kliknuto: {lnk.text}")
+                        time.sleep(3)
+                        downloaded = wait_for_download(temp_dl, timeout=30)
                         break
             except Exception:
                 pass
-            return False
+            if downloaded:
+                break
+            time.sleep(2)
+            driver.refresh() if time.time() % 15 < 2 else None
 
-        from_ok = set_date_via_calendar("Start Date", start_date)
-        time.sleep(0.5)
-        to_ok = set_date_via_calendar("End Date", end_date)
-
-        if not from_ok or not to_ok:
-            print(f"\n[!] Datumi nisu uneti automatski.")
-            print(f"    Unesi rucno u browser:")
-            print(f"    Start Date: {start_date.strftime('%m/%d/%Y')}")
-            print(f"    End Date:   {end_date.strftime('%m/%d/%Y')}")
-            print(f"    Pa pritisni Enter ovdje...")
-            input()
-
-        # ── Klik na Add / Submit dugme ──
-        print("[4/5] Pokretanje downloada...")
-        try:
-            submit_btn = wait.until(EC.element_to_be_clickable(
-                (By.XPATH,
-                 "//button[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'add') or "
-                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'submit') or "
-                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'generat') or "
-                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'export') or "
-                 "contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'download')]")
-            ))
-            submit_btn.click()
-            print(f"[OK] Kliknuto dugme: {submit_btn.text}")
-        except Exception:
-            print("[!] Dugme nije pronadjeno automatski. Klikni ga rucno pa pritisni Enter...")
-            input()
-
-        print("[...] Cekanje na download (max 60s)...")
-        downloaded = wait_for_download(temp_dl, timeout=60)
+        if not downloaded:
+            # Pokusaj direktno cekati fajl (ako download vec pokrenut)
+            downloaded = wait_for_download(temp_dl, timeout=30)
 
         if not downloaded:
             print("[GRESKA] Fajl nije skinut u roku od 60 sekundi.")
